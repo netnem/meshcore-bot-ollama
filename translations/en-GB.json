@@ -58,7 +58,8 @@
     "path": [
       "path",
       "decode",
-      "route"
+      "route",
+      "p"
     ],
     "prefix": [
       "prefix",
