@@ -1377,6 +1377,41 @@ enabled = false
 # Default: color
 avatar_style = color
 
+# ──────────────────────────────────────────────────────────────────
+# AI Chat / Ollama Settings
+# ──────────────────────────────────────────────────────────────────
+[Chat_Command]
+# Enable or disable the AI chat fallback (default: false)
+# When enabled, messages that don't match any command are sent to Ollama
+enabled = false
+
+# Ollama API endpoint URL
+# Use localhost if Ollama runs on the same machine, or a remote IP
+ollama_url = http://localhost:11434/api/chat
+
+# Ollama model to use (must be pulled on the Ollama server)
+ollama_model = llama3.2
+
+# System prompt that instructs the model how to behave
+# Keep the char-limit instruction to fit MeshCore message limits
+system_prompt = You are a helpful assistant responding over a low-bandwidth radio mesh network. Keep every reply under 190 characters. Be concise and direct. No markdown formatting. Try to be casual, and avoid emojis as they will not render well.
+
+# Maximum conversation history entries per user (rolling window)
+max_history = 20
+
+# Timeout in seconds for Ollama API calls
+ollama_timeout = 120
+
+# Per-user cooldown in seconds between chat responses
+cooldown_seconds = 5
+
+# Restrict chat to DMs only (true) or allow in monitored channels too (false)
+dm_only = false
+
+# Optional: restrict chat to specific channels (comma-separated)
+# Leave commented out to use global monitor_channels setting
+# channels = general,chat
+
 # Channel mappings: bridge.<meshcore_channel> = <discord_webhook_url>
 # Only channels explicitly listed here will be bridged to Discord
 # Get webhook URLs from Discord: Channel Settings → Integrations → Webhooks → Create Webhook

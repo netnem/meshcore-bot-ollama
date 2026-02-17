@@ -1042,6 +1042,9 @@ class CommandManager:
         
         Args:
             message: The message triggering the command execution.
+            
+        Returns:
+            bool: True if a command was matched and handled, False otherwise.
         """
         content = message.content.strip()
         
@@ -1120,7 +1123,7 @@ class CommandManager:
                         if stats_command:
                             stats_command.record_command(message, command_name, response_sent)
                     
-                    return
+                    return True
                 
                 # Check network connectivity for commands that require internet
                 if command.requires_internet:
@@ -1139,7 +1142,7 @@ class CommandManager:
                             stats_command = self.commands['stats']
                             if stats_command:
                                 stats_command.record_command(message, command_name, True)
-                        return
+                        return True
                 
                 try:
                     # Record execution time for cooldown tracking
@@ -1245,7 +1248,9 @@ class CommandManager:
                             )
                         except Exception as capture_error:
                             self.logger.debug(f"Failed to capture failed command data: {capture_error}")
-                return
+                return True
+        
+        return False
     
     def _check_internet_cached(self) -> bool:
         """Check internet connectivity with caching to avoid checking on every command.
