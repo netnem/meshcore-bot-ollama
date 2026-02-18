@@ -1378,19 +1378,27 @@ enabled = false
 avatar_style = color
 
 # ──────────────────────────────────────────────────────────────────
-# AI Chat / Ollama Settings
+# AI Chat Settings (OpenAI-compatible API)
 # ──────────────────────────────────────────────────────────────────
+# Works with any OpenAI-compatible endpoint:
+#   - Ollama  (http://localhost:11434/v1/chat/completions)
+#   - OpenAI  (https://api.openai.com/v1/chat/completions)
+#   - LM Studio, vLLM, LocalAI, etc.
 [Chat_Command]
 # Enable or disable the AI chat fallback (default: false)
-# When enabled, messages that don't match any command are sent to Ollama
+# When enabled, messages that don't match any command are sent to the LLM
 enabled = false
 
-# Ollama API endpoint URL
-# Use localhost if Ollama runs on the same machine, or a remote IP
-ollama_url = http://localhost:11434/api/chat
+# OpenAI-compatible chat completions endpoint URL
+# For Ollama running locally:  http://localhost:11434/v1/chat/completions
+# For OpenAI:                  https://api.openai.com/v1/chat/completions
+api_url = http://localhost:11434/v1/chat/completions
 
-# Ollama model to use (must be pulled on the Ollama server)
-ollama_model = llama3.2
+# Model name (must be available on the API server)
+model = llama3.2
+
+# Optional API key (required for OpenAI, optional for local servers)
+# api_key = sk-...
 
 # System prompt that instructs the model how to behave
 # Keep the char-limit instruction to fit MeshCore message limits
@@ -1399,8 +1407,8 @@ system_prompt = You are a helpful assistant responding over a low-bandwidth radi
 # Maximum conversation history entries per user (rolling window)
 max_history = 20
 
-# Timeout in seconds for Ollama API calls
-ollama_timeout = 120
+# Timeout in seconds for API calls
+api_timeout = 120
 
 # Per-user cooldown in seconds between chat responses
 cooldown_seconds = 5

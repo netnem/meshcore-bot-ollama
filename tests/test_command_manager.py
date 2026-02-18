@@ -5,6 +5,7 @@ import time
 import pytest
 from configparser import ConfigParser
 from unittest.mock import Mock, MagicMock, patch, AsyncMock
+from meshcore import EventType
 
 from modules.command_manager import CommandManager, InternetStatusCache
 from modules.models import MeshMessage
@@ -278,3 +279,27 @@ class TestInternetStatusCache:
         lock1 = cache._get_lock()
         lock2 = cache._get_lock()
         assert lock1 is lock2
+
+
+class TestHandleSendResult:
+    """Tests for _handle_send_result behavior."""
+
+    def test_channel_no_event_received_treated_as_success(self, cm_bot):
+        manager = make_manager(cm_bot)
+        result = Mock(type=EventType.ERROR, payload={"reason": "no_event_received"})
+
+        ok = manager._handle_send_result(result, "Channel message", "test-target")
+
+        assert ok is True
+        cm_bot.rate_limiter.record_send.assert_called_once()
+        cm_bot.bot_tx_rate_limiter.record_tx.assert_called_once()
+
+    def test_channel_other_error_returns_false(self, cm_bot):
+        manager = make_manager(cm_bot)
+        result = Mock(type=EventType.ERROR, payload={"reason": "permission_denied"})
+
+        ok = manager._handle_send_result(result, "Channel message", "test-target")
+
+        assert ok is False
+        cm_bot.rate_limiter.record_send.assert_not_called()
+        cm_bot.bot_tx_rate_limiter.record_tx.assert_not_called()

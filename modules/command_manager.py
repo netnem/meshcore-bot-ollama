@@ -330,6 +330,21 @@ class CommandManager:
         if hasattr(result, 'type'):
             if result.type == EventType.ERROR:
                 error_payload = result.payload if hasattr(result, 'payload') else {}
+                if (
+                    operation_name == "Channel message"
+                    and isinstance(error_payload, dict)
+                    and error_payload.get('reason') == 'no_event_received'
+                ):
+                    # Channel messages are broadcast – the device firmware
+                    # doesn't send a confirmation event, so this is normal.
+                    self.logger.info(f"✅ Channel message sent to {target} (no ACK expected for channel broadcasts)")
+                    self.bot.rate_limiter.record_send()
+                    self.bot.bot_tx_rate_limiter.record_tx()
+                    if getattr(self.bot, 'per_user_rate_limit_enabled', False) and rate_limit_key:
+                        per_user = getattr(self.bot, 'per_user_rate_limiter', None)
+                        if per_user:
+                            per_user.record_send(rate_limit_key)
+                    return True
                 self.logger.error(f"❌ {operation_name} failed to {target}: {error_payload if error_payload else 'Unknown error'}")
                 return False
             
@@ -348,20 +363,6 @@ class CommandManager:
             
             # Handle unexpected event types
             event_name = getattr(result.type, 'name', str(result.type))
-            
-            # Special handling for channel messages with timeout/no_event_received
-            if operation_name == "Channel message":
-                error_payload = result.payload if hasattr(result, 'payload') else {}
-                if isinstance(error_payload, dict) and error_payload.get('reason') == 'no_event_received':
-                    # Message likely sent but confirmation timed out - treat as success with warning
-                    self.logger.warning(f"Channel message sent to {target} but confirmation event not received (message may have been sent)")
-                    self.bot.rate_limiter.record_send()
-                    self.bot.bot_tx_rate_limiter.record_tx()
-                    if getattr(self.bot, 'per_user_rate_limit_enabled', False) and rate_limit_key:
-                        per_user = getattr(self.bot, 'per_user_rate_limiter', None)
-                        if per_user:
-                            per_user.record_send(rate_limit_key)
-                    return True
             
             # Unknown event type - log warning
             self.logger.warning(f"{operation_name} to {target}: unexpected event type {event_name}")

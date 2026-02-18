@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
 Chat command for the MeshCore Bot
-Provides AI chatbot functionality via Ollama as a fallback for unrecognized messages.
-When enabled, any message that doesn't match a known command is forwarded to an
-Ollama LLM instance and the response is sent back to the user.
+Provides AI chatbot functionality via any OpenAI-compatible API endpoint
+(Ollama, OpenAI, LM Studio, vLLM, LocalAI, etc.) as a fallback for
+unrecognized messages.  When enabled, any message that doesn't match a
+known command is forwarded to the configured LLM and the response is
+sent back to the user.
 """
 
 import re
@@ -16,7 +18,8 @@ from ..models import MeshMessage
 
 
 class ChatCommand(BaseCommand):
-    """Handles AI chat via Ollama as a fallback for unrecognized messages.
+    """Handles AI chat via an OpenAI-compatible API as a fallback for
+    unrecognized messages.
 
     This command is special: it does NOT use keyword matching.  Instead, the
     message handler invokes it explicitly when no other command matched.
@@ -27,24 +30,32 @@ class ChatCommand(BaseCommand):
     # Plugin metadata
     name = "chat"
     keywords = []  # Empty — this is a fallback, not a keyword-triggered command
-    description = "AI chatbot powered by Ollama (fallback for unrecognized messages)"
+    description = "AI chatbot via OpenAI-compatible API (fallback for unrecognized messages)"
     category = "ai"
     cooldown_seconds = 0  # Per-user cooldown loaded from config
     requires_dm = False
-    requires_internet = True  # Needs network access to reach Ollama
+    requires_internet = True  # Needs network access to reach the LLM API
 
     def __init__(self, bot: Any):
         super().__init__(bot)
 
-        # ── Load Ollama configuration ──────────────────────────
+        # ── Load LLM / OpenAI-compatible API configuration ─────
         self.chat_enabled = self.get_config_value(
             'Chat_Command', 'enabled', fallback=True, value_type='bool')
-        self.ollama_url = self.get_config_value(
-            'Chat_Command', 'ollama_url',
-            fallback='http://localhost:11434/api/chat')
-        self.ollama_model = self.get_config_value(
-            'Chat_Command', 'ollama_model',
-            fallback='llama3.2')
+
+        # Support both new (api_url) and legacy (ollama_url) config keys
+        self.api_url = self.get_config_value(
+            'Chat_Command', 'api_url',
+            fallback=self.get_config_value(
+                'Chat_Command', 'ollama_url',
+                fallback=''))
+        self.model = self.get_config_value(
+            'Chat_Command', 'model',
+            fallback=self.get_config_value(
+                'Chat_Command', 'ollama_model',
+                fallback='llama3.2'))
+        self.api_key = self.get_config_value(
+            'Chat_Command', 'api_key', fallback='')
         self.system_prompt = self.get_config_value(
             'Chat_Command', 'system_prompt',
             fallback=(
@@ -55,8 +66,11 @@ class ChatCommand(BaseCommand):
             ))
         self.max_history = self.get_config_value(
             'Chat_Command', 'max_history', fallback=20, value_type='int')
-        self.ollama_timeout = self.get_config_value(
-            'Chat_Command', 'ollama_timeout', fallback=120, value_type='int')
+        self.api_timeout = self.get_config_value(
+            'Chat_Command', 'api_timeout',
+            fallback=self.get_config_value(
+                'Chat_Command', 'ollama_timeout', fallback=120, value_type='int'),
+            value_type='int')
         self.cooldown_seconds = self.get_config_value(
             'Chat_Command', 'cooldown_seconds', fallback=5, value_type='int')
         self.dm_only = self.get_config_value(
@@ -66,9 +80,15 @@ class ChatCommand(BaseCommand):
         # Maps sender_id -> deque of {"role": ..., "content": ...}
         self._histories: Dict[str, deque] = {}
 
-        self.logger.info(
-            f"ChatCommand initialised: model={self.ollama_model}, "
-            f"url={self.ollama_url}, enabled={self.chat_enabled}")
+        # Auto-disable chat if no API URL is configured
+        if not self.api_url:
+            self.chat_enabled = False
+            self.logger.warning(
+                "ChatCommand disabled: no api_url configured in [Chat_Command]")
+        else:
+            self.logger.info(
+                f"ChatCommand initialised: model={self.model}, "
+                f"url={self.api_url}, enabled={self.chat_enabled}")
 
     # ── Plugin interface overrides ─────────────────────────────
 
@@ -83,7 +103,7 @@ class ChatCommand(BaseCommand):
     # ── Public API (called from message_handler) ───────────────
 
     async def handle_fallback(self, message: MeshMessage) -> bool:
-        """Process an unrecognized message through Ollama.
+        """Process an unrecognized message through the LLM API.
 
         Called explicitly by the message handler when no command matched.
 
@@ -127,9 +147,9 @@ class ChatCommand(BaseCommand):
         history.append({"role": "user", "content": content})
 
         try:
-            reply = await self._query_ollama(list(history))
+            reply = await self._query_llm(list(history))
         except Exception as e:
-            self.logger.error(f"Ollama query failed: {e}")
+            self.logger.error(f"LLM query failed: {e}")
             reply = self.translate('commands.chat.error', error=str(e))
             if reply == 'commands.chat.error':
                 reply = f"Chat error: {e}"
@@ -162,10 +182,14 @@ class ChatCommand(BaseCommand):
         """Standard execute entry point (delegates to handle_fallback)."""
         return await self.handle_fallback(message)
 
-    # ── Ollama helpers ─────────────────────────────────────────
+    # ── LLM helpers ────────────────────────────────────────────
 
-    async def _query_ollama(self, history: list) -> str:
-        """Call Ollama chat API in a background thread.
+    async def _query_llm(self, history: list) -> str:
+        """Call an OpenAI-compatible chat completions API in a background thread.
+
+        Works with Ollama (/v1/chat/completions), OpenAI, LM Studio,
+        vLLM, LocalAI, and any other provider that implements the
+        OpenAI chat completions contract.
 
         Args:
             history: List of message dicts for conversation context.
@@ -180,14 +204,20 @@ class ChatCommand(BaseCommand):
                 {"role": "system", "content": self.system_prompt}
             ] + history
             payload = {
-                "model": self.ollama_model,
+                "model": self.model,
                 "messages": messages,
                 "stream": False,
             }
+            headers = {"Content-Type": "application/json"}
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
             resp = requests.post(
-                self.ollama_url, json=payload, timeout=self.ollama_timeout)
+                self.api_url, json=payload, headers=headers,
+                timeout=self.api_timeout)
             resp.raise_for_status()
-            answer = resp.json()["message"]["content"]
+            data = resp.json()
+            # OpenAI-compatible response format
+            answer = data["choices"][0]["message"]["content"]
             # Strip <think>…</think> blocks from thinking models
             answer = re.sub(
                 r"<think>.*?</think>", "", answer, flags=re.DOTALL).strip()

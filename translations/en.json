@@ -1011,7 +1011,7 @@
       "description": "List available commands"
     },
     "chat": {
-      "description": "AI chatbot powered by Ollama (fallback for unrecognized messages)",
+      "description": "AI chatbot via OpenAI-compatible API (fallback for unrecognized messages)",
       "error": "Chat error: {error}"
     }
   },

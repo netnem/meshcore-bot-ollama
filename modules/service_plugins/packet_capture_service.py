@@ -233,7 +233,7 @@ class PacketCaptureService(BaseServicePlugin):
             
             broker = {
                 'enabled': True,
-                'host': config.get('PacketCapture', server_key, fallback='localhost'),
+                'host': config.get('PacketCapture', server_key),
                 'port': config.getint('PacketCapture', f'mqtt{broker_num}_port', fallback=1883),
                 'username': config.get('PacketCapture', f'mqtt{broker_num}_username', fallback=None),
                 'password': config.get('PacketCapture', f'mqtt{broker_num}_password', fallback=None),
