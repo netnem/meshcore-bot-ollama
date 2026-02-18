@@ -15,7 +15,7 @@
     "sports": ["sports", "score", "scores"],
     "stats": ["stats"],
     "channels": ["channels", "channel"],
-    "path": ["path", "decode", "route"],
+    "path": ["path", "decode", "route", "p"],
     "prefix": ["prefix", "repeater", "lookup"],
     "repeater": ["repeater", "repeaters", "rp"],
     "solarforecast": ["sf", "solarforecast"],
@@ -1009,6 +1009,10 @@
     },
     "cmd": {
       "description": "List available commands"
+    },
+    "chat": {
+      "description": "AI chatbot via OpenAI-compatible API (fallback for unrecognized messages)",
+      "error": "Chat error: {error}"
     }
   },
   "elapsed": {

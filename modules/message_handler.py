@@ -2925,8 +2925,20 @@ class MessageHandler:
         # Only execute commands if no help response was sent and no plugin command with response was matched
         # Help responses and plugin commands with responses should be the final response for that message
         # Plugin commands without responses (response is None) should still be executed
+        command_handled = False
         if not help_response_sent and not plugin_command_with_response_matched:
-            await self.bot.command_manager.execute_commands(message)
+            command_handled = await self.bot.command_manager.execute_commands(message)
+        else:
+            command_handled = True  # A keyword/help match already handled it
+
+        # If no command matched at all, forward the message to the AI chatbot
+        if not command_handled and not keyword_matches:
+            if 'chat' in self.bot.command_manager.commands:
+                chat_command = self.bot.command_manager.commands['chat']
+                try:
+                    await chat_command.handle_fallback(message)
+                except Exception as e:
+                    self.logger.error(f"Error in chat fallback: {e}")
     
     def should_process_message(self, message: MeshMessage) -> bool:
         """Check if message should be processed by the bot"""

@@ -19,13 +19,28 @@ class BotIntegration:
     
     def __init__(self, bot):
         self.bot = bot
+        self.enabled = self._is_web_viewer_enabled()
         self.circuit_breaker_open = False
         self.circuit_breaker_failures = 0
         self.is_shutting_down = False
+        self.http_session = None
+
+        if not self.enabled:
+            return
+
         # Initialize HTTP session with connection pooling for efficient reuse
         self._init_http_session()
         # Initialize the packet_stream table
         self._init_packet_stream_table()
+
+    def _is_web_viewer_enabled(self):
+        """Check if web viewer is enabled in configuration."""
+        try:
+            if not self.bot.config.has_section('Web_Viewer'):
+                return False
+            return self.bot.config.getboolean('Web_Viewer', 'enabled', fallback=False)
+        except Exception:
+            return False
     
     def _init_http_session(self):
         """Initialize a requests.Session with connection pooling and keep-alive"""
@@ -135,6 +150,9 @@ class BotIntegration:
     
     def capture_full_packet_data(self, packet_data):
         """Capture full packet data and store in database for web viewer"""
+        if not self.enabled:
+            return
+
         try:
             import sqlite3
             import json
@@ -188,6 +206,9 @@ class BotIntegration:
     
     def capture_command(self, message, command_name, response, success, command_id=None):
         """Capture command data and store in database for web viewer"""
+        if not self.enabled:
+            return
+
         try:
             import sqlite3
             import json
@@ -247,6 +268,9 @@ class BotIntegration:
     
     def capture_packet_routing(self, routing_data):
         """Capture packet routing data and store in database for web viewer"""
+        if not self.enabled:
+            return
+
         try:
             import sqlite3
             import json
@@ -274,6 +298,9 @@ class BotIntegration:
     
     def cleanup_old_data(self, days_to_keep: int = 7):
         """Clean up old packet stream data to prevent database bloat"""
+        if not self.enabled:
+            return
+
         try:
             import sqlite3
             import time
@@ -324,6 +351,9 @@ class BotIntegration:
     
     def send_mesh_edge_update(self, edge_data):
         """Send mesh edge update to web viewer via HTTP API"""
+        if not self.enabled:
+            return
+
         try:
             # Get web viewer URL from config
             host = self.bot.config.get('Web_Viewer', 'host', fallback='127.0.0.1')
@@ -355,6 +385,9 @@ class BotIntegration:
     
     def send_mesh_node_update(self, node_data):
         """Send mesh node update to web viewer via HTTP API"""
+        if not self.enabled:
+            return
+
         try:
             import requests
             import json
