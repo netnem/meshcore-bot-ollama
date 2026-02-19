@@ -2,10 +2,9 @@
 """
 Chat command for the MeshCore Bot
 Provides AI chatbot functionality via any OpenAI-compatible API endpoint
-(Ollama, OpenAI, LM Studio, vLLM, LocalAI, etc.) as a fallback for
-unrecognized messages.  When enabled, any message that doesn't match a
-known command is forwarded to the configured LLM and the response is
-sent back to the user.
+as a fallback for unrecognized messages.  When enabled, any message that
+doesn't match a known command is forwarded to the configured LLM and the
+response is sent back to the user.
 """
 
 import re
@@ -43,17 +42,10 @@ class ChatCommand(BaseCommand):
         self.chat_enabled = self.get_config_value(
             'Chat_Command', 'enabled', fallback=True, value_type='bool')
 
-        # Support both new (api_url) and legacy (ollama_url) config keys
         self.api_url = self.get_config_value(
-            'Chat_Command', 'api_url',
-            fallback=self.get_config_value(
-                'Chat_Command', 'ollama_url',
-                fallback=''))
+            'Chat_Command', 'api_url', fallback='')
         self.model = self.get_config_value(
-            'Chat_Command', 'model',
-            fallback=self.get_config_value(
-                'Chat_Command', 'ollama_model',
-                fallback='llama3.2'))
+            'Chat_Command', 'model', fallback='gpt-4o-mini')
         self.api_key = self.get_config_value(
             'Chat_Command', 'api_key', fallback='')
         self.system_prompt = self.get_config_value(
@@ -67,10 +59,7 @@ class ChatCommand(BaseCommand):
         self.max_history = self.get_config_value(
             'Chat_Command', 'max_history', fallback=20, value_type='int')
         self.api_timeout = self.get_config_value(
-            'Chat_Command', 'api_timeout',
-            fallback=self.get_config_value(
-                'Chat_Command', 'ollama_timeout', fallback=120, value_type='int'),
-            value_type='int')
+            'Chat_Command', 'api_timeout', fallback=120, value_type='int')
         self.cooldown_seconds = self.get_config_value(
             'Chat_Command', 'cooldown_seconds', fallback=5, value_type='int')
         self.dm_only = self.get_config_value(
@@ -187,9 +176,8 @@ class ChatCommand(BaseCommand):
     async def _query_llm(self, history: list) -> str:
         """Call an OpenAI-compatible chat completions API in a background thread.
 
-        Works with Ollama (/v1/chat/completions), OpenAI, LM Studio,
-        vLLM, LocalAI, and any other provider that implements the
-        OpenAI chat completions contract.
+        Works with OpenAI, LM Studio, vLLM, LocalAI, and any other provider
+        that implements the OpenAI chat completions contract.
 
         Args:
             history: List of message dicts for conversation context.

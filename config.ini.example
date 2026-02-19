@@ -124,7 +124,7 @@ startup_advert = false
 # device: Device handles auto-addition using standard auto-discovery mode, bot manages contact list capacity (purge old contacts when near limits)
 # bot: Bot automatically adds new companion contacts to device, bot manages contact list capacity (purge old contacts when near limits)
 # false: Manual mode - no automatic actions, use !repeater commands to manage contacts (default)
-auto_manage_contacts = false
+auto_manage_contacts = bot
 
 # Database path for main bot database
 # Default: meshcore_bot.db
@@ -1381,21 +1381,19 @@ avatar_style = color
 # AI Chat Settings (OpenAI-compatible API)
 # ──────────────────────────────────────────────────────────────────
 # Works with any OpenAI-compatible endpoint:
-#   - Ollama  (http://localhost:11434/v1/chat/completions)
 #   - OpenAI  (https://api.openai.com/v1/chat/completions)
-#   - LM Studio, vLLM, LocalAI, etc.
+#   - LM Studio, vLLM, LocalAI, or any OpenAI-compatible server
 [Chat_Command]
 # Enable or disable the AI chat fallback (default: false)
 # When enabled, messages that don't match any command are sent to the LLM
 enabled = false
 
 # OpenAI-compatible chat completions endpoint URL
-# For Ollama running locally:  http://localhost:11434/v1/chat/completions
-# For OpenAI:                  https://api.openai.com/v1/chat/completions
-api_url = http://localhost:11434/v1/chat/completions
+# Example: https://api.openai.com/v1/chat/completions
+api_url = https://api.openai.com/v1/chat/completions
 
 # Model name (must be available on the API server)
-model = llama3.2
+model = gpt-4o-mini
 
 # Optional API key (required for OpenAI, optional for local servers)
 # api_key = sk-...

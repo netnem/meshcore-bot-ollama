@@ -8,7 +8,7 @@
 #   2. Copy bot files to installation directory
 #   3. Set up proper file permissions
 #   4. Install and enable the service (systemd or launchd)
-#   5. Create a Python virtual environment with dependencies
+#   5. Create a Python 3.13 virtual environment with dependencies (via uv)
 #
 # Usage:
 #   ./install-service.sh          # Normal installation (non-destructive if already installed)
@@ -17,9 +17,9 @@
 #
 # Prerequisites:
 #   - Linux system with systemd OR macOS
-#   - Python 3.7+ installed
 #   - sudo access (script will prompt if needed)
 #   - Run from the meshcore-bot directory
+#   - Internet connection (to install uv and Python 3.13 if needed)
 
 set -e
 
@@ -199,11 +199,20 @@ else
     fi
 fi
 
-# Check if Python 3 is available
-if ! command -v python3 &> /dev/null; then
-    print_error "Python 3 is not installed or not in PATH"
-    print_error "Please install Python 3.7 or higher before running this script"
-    exit 1
+# Install uv if not available
+if ! command -v uv &> /dev/null; then
+    print_info "uv package manager not found - installing..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh 2>/dev/null
+    # Add common uv install locations to PATH for this session
+    export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+    if ! command -v uv &> /dev/null; then
+        print_error "Failed to install uv"
+        print_error "Please install uv manually: https://docs.astral.sh/uv/getting-started/installation/"
+        exit 1
+    fi
+    print_success "uv installed successfully"
+else
+    print_success "uv is already installed: $(uv --version)"
 fi
 
 print_section "Step 1: Setting Up Service User"
@@ -420,36 +429,48 @@ fi
 
 # Create venv and install dependencies before chown so the service user ends up
 # owning a complete, working venv (avoids partial root-owned venv and import errors).
-print_section "Step 4: Setting Up Python Virtual Environment"
+print_section "Step 4: Setting Up Python 3.13 Virtual Environment (via uv)"
+
+# Store uv-managed Python inside the install dir so the meshcore service user
+# can access it (running under sudo would otherwise put it in /root/.local).
+export UV_PYTHON_INSTALL_DIR="$INSTALL_DIR/.python"
+mkdir -p "$UV_PYTHON_INSTALL_DIR"
+print_info "Python installations will be stored in $UV_PYTHON_INSTALL_DIR"
+
 if [ -d "$INSTALL_DIR/venv" ]; then
     print_info "Virtual environment already exists at $INSTALL_DIR/venv"
-    print_info "Preserving existing virtual environment"
     if [[ "$UPGRADE_MODE" == true ]]; then
-        print_info "Upgrade mode: will update dependencies"
+        print_info "Upgrade mode: recreating virtual environment with Python 3.13"
+        uv venv "$INSTALL_DIR/venv" --python 3.13 --seed || {
+            print_error "Failed to create virtual environment with Python 3.13"
+            print_info "uv will download Python 3.13 automatically if not already available"
+            exit 1
+        }
+        print_success "Recreated virtual environment with Python 3.13"
     else
+        print_info "Preserving existing virtual environment"
         print_info "Will update dependencies if requirements.txt changed"
     fi
 else
-    print_info "Creating an isolated Python environment for the bot"
-    print_info "This ensures dependencies don't conflict with system Python packages"
-    python3 -m venv "$INSTALL_DIR/venv"
-    print_success "Created virtual environment at $INSTALL_DIR/venv"
+    print_info "Creating an isolated Python 3.13 environment for the bot using uv"
+    print_info "uv will download Python 3.13 automatically if not already available"
+    uv venv "$INSTALL_DIR/venv" --python 3.13 --seed || {
+        print_error "Failed to create virtual environment with Python 3.13"
+        exit 1
+    }
+    print_success "Created virtual environment at $INSTALL_DIR/venv (Python 3.13)"
 fi
 
-# Upgrade pip first
-print_info "Upgrading pip to latest version"
-"$INSTALL_DIR/venv/bin/pip" install --quiet --upgrade pip >/dev/null 2>&1 || true
-
-# Install dependencies in venv
+# Install dependencies in venv using uv
 print_info "Installing Python dependencies from requirements.txt"
 print_info "This may take a few minutes depending on your internet connection..."
 if [ ! -f "$INSTALL_DIR/requirements.txt" ]; then
     print_error "requirements.txt not found in installation directory"
     exit 1
 fi
-"$INSTALL_DIR/venv/bin/pip" install --quiet -r "$INSTALL_DIR/requirements.txt" || {
+uv pip install --python "$INSTALL_DIR/venv/bin/python" -r "$INSTALL_DIR/requirements.txt" || {
     print_error "Failed to install Python dependencies"
-    print_info "You may need to check your internet connection or Python version"
+    print_info "You may need to check your internet connection"
     exit 1
 }
 print_success "Installed all Python dependencies"
